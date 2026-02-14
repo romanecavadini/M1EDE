@@ -1,0 +1,42 @@
+# --- Environnements Virtuels ---
+.venv/
+venv/
+env/
+ENV/
+bin/
+lib/
+include/
+
+# --- Python (Fichiers temporaires) ---
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+# Si tu ne veux pas partager tes gros fichiers de config notebook :
+.local/share/jupyter/
+
+# --- Données (Data) ---
+# On ignore les fichiers de données lourds (souvent >100Mo ou locaux)
+*.csv
+*.xlsx
+*.parquet
+*.json
+*.sql
+*.sqlite
+# Si tu as un dossier spécifique pour la data :
+data/
+
+# --- Windows / Système ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Configuration & Secrets ---
+.env
+.vscode/
+.idea/
