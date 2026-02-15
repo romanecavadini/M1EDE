@@ -1,18 +1,79 @@
+#%%
+
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from sklearn import decomposition
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
 
-raw_dataset = "../data/RES2-6-9.csv"
-df =  pd.read_csv(raw_dataset)
+#%%
+raw_dataset = Path.cwd() / ".." /"data" / "RES2-6-9.csv"
+df = pd.read_csv(raw_dataset, 
+                 sep=';',      # Le séparateur de colonnes
+                 decimal='.') # Optionnel : transforme la 2ème colonne en vraie date
+print(df.head(), df.info())
+
+#%%
+# # --- Convert 'horodate' to datetime with UTC normalization ---
+df['horodate'] = pd.to_datetime(df['horodate'], utc=True)  # Convert 'horodate' column to datetime with UTC timezone
+df = df.set_index('horodate')  # Set 'horodate' as the index
 
 
+
+#%%
+# --- Use 'jour' column directly ---
+df['jour'] = df.index.date
+
+df_pivot = df.pivot_table(index='ID', columns=df.index, values='valeur', aggfunc='first')
+df_pivot = df_pivot.fillna(0)
+
+print(df_pivot.shape, df_pivot.head)
+
+#%%
+df_daily = df_pivot.T.resample('D').sum().T
+df_daily.head
+
+# #%%
+# pca = decomposition.PCA()
+# pca.fit(df_pivot)
+
+#%%
+# features
+
+# Un jour est considéré comme "inoccupé" si la conso est très faible par rapport à l'habitude
+id_mean_conso = df_daily.mean(axis=1)
+# Pourcentage de jours de l'année où la maison est "éteinte"
+df_daily_norm = df_daily.div(id_mean_conso, axis=0)
+#print(df_daily_norm.head)
+
+df_features = pd.DataFrame((df_daily_norm < 0.50).mean(axis=1), columns=['taux d\'occupation'])
+print(df_features.head)
+print(type(df_features))
+
+
+# #%%
+# plt.plot(pca.explained_variance_)
+# plt.figure()
+# proportion_of_variance = [sum(pca.explained_variance_[0: k])/sum(pca.explained_variance_) for k in range(1, 17472)]
+# plt.plot(proportion_of_variance)
+
+# def nb_comp(q):
+#   k=0
+#   while proportion_of_variance[k] < q:
+#     k += 1
+#   return k+1
+# print(nb_comp(.8))
+# print(nb_comp(.9))
+# print(nb_comp(.99))
+#%%
 # --- 1. Préparation des données ---
 # Il est important de scaler les données avant d'appliquer K-Means
 scaler = StandardScaler()
-scaled_data = scaler.fit_transform(dataset)
+scaled_data = scaler.fit_transform(df_features)
 
+#%%
 # --- 2. Détermination du nombre optimal de clusters (méthode du coude) ---
 wcss = [] # Within-Cluster Sum of Squares
 for i in range(1, 11): # Essayer de 1 à 10 clusters
@@ -70,3 +131,13 @@ elif scaled_data.shape[1] == 1:
     plt.show()
 else:
     print("\nLe dataset a des dimensions insuffisantes pour une visualisation standard des clusters.")
+
+#%%
+# Utilisation des résultats
+
+print(clusters)
+# %%
+print([kmeans_model.cluster_centers_[:, i] for i in range(365)])
+# %%
+print(sum([1 for i in scaled_data[clusters == 0, 0]]), sum([1 for i in scaled_data[clusters == 1, 0]]))
+# %%
