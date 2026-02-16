@@ -48,7 +48,25 @@ id_mean_conso = df_daily.mean(axis=1)
 df_daily_norm = df_daily.div(id_mean_conso, axis=0)
 #print(df_daily_norm.head)
 
-df_features = pd.DataFrame((df_daily_norm < 0.50).mean(axis=1), columns=['taux d\'occupation'])
+# Créer des features pour détecter occupation/vacance
+df_features = pd.DataFrame()
+
+# Feature 1: Taux d'occupation général (jours avec faible conso)
+df_features['taux_occupation'] = ((0 < df_daily_norm) & (df_daily_norm < 0.20)).mean(axis=1)
+
+# Feature 2: Taux d'occupation weekend (samedi/dimanche)
+weekend_mask = df_daily_norm.columns.dayofweek >= 5  # 5=samedi, 6=dimanche
+df_features['taux_occupation_weekend'] = ((0 < df_daily_norm.loc[:, weekend_mask]) & (df_daily_norm.loc[:, weekend_mask] < 0.20)).mean(axis=1)
+
+# Feature 3: Variabilité de la consommation (écart-type normalisé = imprévisibilité)
+df_features['variabilite_conso'] = df_daily_norm.std(axis=1)
+
+# Feature 4: Jours inactifs (consommation quasi-nulle)
+df_features['taux_jours_inactifs'] = (df_daily_norm < 0.05).mean(axis=1)
+
+# Feature 5: Stabilité consommation (ratio min/max, proche de 1 = stable = occupé)
+df_features['stabilite_conso'] = df_daily_norm.min(axis=1) / (df_daily_norm.max(axis=1) + 1e-6)
+
 print(df_features.head)
 print(type(df_features))
 
