@@ -153,6 +153,7 @@ else:
 #%%
 # Utilisation des résultats
 
+
 print(clusters)
 # %%
 print([kmeans_model.cluster_centers_[:, i] for i in range(365)])
