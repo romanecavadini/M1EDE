@@ -1,0 +1,29 @@
+import numpy as np
+
+class LogisticRegressionMLE:
+    def __init__(self, lr=0.01, n_iter=1000):
+        self.lr = lr
+        self.n_iter = n_iter
+        self.beta = None
+
+    def sigmoid(self, z):
+        return 1 / (1 + np.exp(-z))
+
+    def fit(self, X, y):
+        n, p = X.shape
+        self.beta = np.zeros(p)
+
+        for _ in range(self.n_iter):
+            z = X @ self.beta
+            p_hat = self.sigmoid(z)
+            
+            gradient = X.T @ (y - p_hat)
+            self.beta += self.lr * gradient
+
+        return self
+
+    def predict_proba(self, X):
+        return self.sigmoid(X @ self.beta)
+
+    def predict(self, X, threshold=0.5):
+        return (self.predict_proba(X) >= threshold).astype(int)
