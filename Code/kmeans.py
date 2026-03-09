@@ -2,7 +2,7 @@
 
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import silhouette_score
 from sklearn import decomposition
 import matplotlib.pyplot as plt
@@ -144,9 +144,14 @@ print(df_features.head())
 # print(nb_comp(.99))
 #%%
 # --- 1. Préparation des données ---
-# Il est important de scaler les données avant d'appliquer K-Means
-scaler = StandardScaler()
-scaled_data = scaler.fit_transform(df_features)
+# 1a. On scale les données (centrées-réduites) pour l'algorithme K-Means
+scaler_standard = StandardScaler()
+scaled_data = scaler_standard.fit_transform(df_features)
+
+# 1b. On normalise les données (0 à 1) UNIQUEMENT pour la visualisation finale
+scaler_minmax = MinMaxScaler()
+normalized_data = scaler_minmax.fit_transform(df_features)
+df_normalized = pd.DataFrame(normalized_data, columns=df_features.columns, index=df_features.index)
 
 #%%
 # --- 2. Détermination du nombre optimal de clusters (méthode du coude et silhouette) ---
@@ -189,7 +194,7 @@ print("\nSur la base des graphiques ci-dessus, choisissez une valeur de 'k' opti
 
 # --- 3. Application de l'algorithme K-Means ---
 # Remplacez la valeur de 'k' ci-dessous par celle que vous avez choisie après avoir examiné le graphique.
-k = 2 # Exemple: nous utilisons k=3. Vous pouvez modifier cette valeur.
+k = 5 # Exemple: nous utilisons k=3. Vous pouvez modifier cette valeur.
 
 kmeans_model = KMeans(n_clusters=k, init='k-means++', max_iter=300, n_init=10, random_state=42)
 clusters = kmeans_model.fit_predict(scaled_data)
@@ -230,11 +235,99 @@ else:
 
 #%%
 # Utilisation des résultats
+# %%
+# Utilisation des résultats
+
+# 1. On crée des alias kourts: ["F1", "F2", "F3", ...]
+noms_originaux = df_normalized.columns
+noms_courts = [f"F{i+1}" for i in range(len(noms_originaux))]
+
+# 2. On prépare la légende explicative qui relie les Fx aux vrais noms
+legende_texte = "Légende des features :\n" + "\n".join([f"{court} : {vrai}" for court, vrai in zip(noms_courts, noms_originaux)])
+
+for i in range(k):
+    # Création d'une figure assez large
+    plt.figure(figsize=(10, 5))
+    
+    # Calcul des moyennes pour le cluster en cours (sur les données 0-1)
+    moyennes_cluster = df_normalized.loc[clusters == i, :].mean(axis=0)
+    
+    # On trace en utilisant nos alias kourts pour l'axe X
+    plt.plot(noms_courts, moyennes_cluster.values, marker='o', linewidth=2, color='tab:blue')
+    
+    plt.title(f"Profil moyen des features - Cluster {i}")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    
+    # 3. On ajoute la boîte de texte à droite du graphique (x=1.02, y=0.5 correspond à la droite au milieu)
+    plt.gcf().text(1.02, 0.5, legende_texte, fontsize=9, verticalalignment='center', 
+                   bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.5))
+                   
+    # Ajuste automatiquement les marges, 'rect' empêche le graphique de mordre sur le texte à droite
+    plt.tight_layout(rect=[0, 0, 0.75, 1]) 
+    plt.show()
+# %%
+# --- 5. Classification finale en 2 clusters (Maison principale ou secondaire) ---
+# On va regrouper les k clusters en 2 catégories : Principale (0) et Secondaire (1).
+# On utilise un algorithme KMeans avec 2 clusters sur les centroïdes de nos k clusters.
+
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+
+kmeans_meta = KMeans(n_clusters=2, n_init=10, random_state=42)
+meta_clusters = kmeans_meta.fit_predict(kmeans_model.cluster_centers_)
+
+# La caractéristique 'concentration_top10' (ou 'taux_jours_inactifs') est typiquement 
+# plus élevée pour les maisons secondaires. On l'utilise pour définir quel méta-cluster est "Secondaire".
+id_concentration = df_features.columns.get_loc('concentration_top10')
+if kmeans_meta.cluster_centers_[0, id_concentration] > kmeans_meta.cluster_centers_[1, id_concentration]:
+    meta_secondaire = 0
+else:
+    meta_secondaire = 1
+
+print("\n--- Mapping des clusters K-Means vers les 2 classes finales ---")
+cluster_to_class = {}
+for i in range(k):
+    # Si le cluster i appartient au méta-cluster 'secondaire', on lui assigne 1, sinon 0
+    classe_finale = 1 if meta_clusters[i] == meta_secondaire else 0
+    nom_classe = "Secondaire (1)" if classe_finale == 1 else "Principale (0)"
+    cluster_to_class[i] = classe_finale
+    print(f"Cluster initial {i} -> {nom_classe}")
+
+# Application du binarisme à notre jeu de données
+df_results = pd.DataFrame(index=df_features.index)
+df_results['cluster_initial'] = clusters
+df_results['prediction_binaire'] = df_results['cluster_initial'].map(cluster_to_class)
+
+# %%
+# --- 6. Comparaison avec les vrais labels ---
+
+labels_path = script_dir / ".." / "data" / "RES2-6-9-labels.csv"
+if labels_path.exists():
+    df_labels = pd.read_csv(labels_path)
+    df_labels = df_labels.set_index('id')
+    
+    # Jointure avec nos prédictions en s'assurant que l'index correspond
+    df_eval = df_results.join(df_labels[['label']], how='inner')
+    
+    print("\n--- Comparaison avec les données labellisées (RES2-6-9-labels.csv) ---")
+    cm = confusion_matrix(df_eval['label'], df_eval['prediction_binaire'])
+    
+    print("Rapport de classification :")
+    print(classification_report(df_eval['label'], df_eval['prediction_binaire'], target_names=['Principale (0)', 'Secondaire (1)']))
+    
+    # Affichage graphique de la matrice de confusion
+    fig, ax = plt.subplots(figsize=(5, 4))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Principale (0)', 'Secondaire (1)'])
+    disp.plot(cmap='Blues', ax=ax)
+    plt.title("Matrice de confusion : Prédictions vs Vrais Labels")
+    plt.tight_layout()
+    plt.show()
+else:
+    print(f"\nFichier de labels introuvable à l'emplacement : {labels_path}")
+# %%
+## verification des clusters
 
 
-print(clusters)
-# %%
-print([kmeans_model.cluster_centers_[:, i] for i in range(10)])
-# %%
-print(sum([1 for i in scaled_data[clusters == 0, 0]]), sum([1 for i in scaled_data[clusters == 1, 0]]))
+
+
+
 # %%
