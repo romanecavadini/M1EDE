@@ -1,0 +1,91 @@
+#on commence par importer les librairies nécessaires pour l'analyse de données, la modélisation et la visualisation.
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+import plotly.io as pio
+pio.renderers.default = "notebook_connected"
+
+DATA_PATH = "res.csv"
+COL_PDL = "pdl_id" #identifiant unique du point de livraison
+COL_DT  = "datetime" #timestamp de la mesure
+COL_PWR = "p_kw" #puissance en kW
+
+
+#La colonne datetime est convertie au format datetime de pandas, en s'assurant que le fuseau horaire est correctement géré (ici, Europe/Paris). Cela est crucial pour les étapes suivantes où nous extrairons des informations temporelles (jour, heure, saison).
+
+raw = pd.read_csv(DATA_PATH, sep=",")
+raw = raw.rename(columns={"id": COL_PDL, "horodate": COL_DT, "valeur": COL_PWR})
+
+# parsing datetime
+raw[COL_DT] = pd.to_datetime(raw[COL_DT], utc=True, errors="coerce")
+
+# option: forcer timezone Europe/Paris (recommandé pour "jour" et "hh_index")
+# si raw[COL_DT] est tz-aware: tz_convert marche
+# si tz-naive: tz_localize
+if raw[COL_DT].dt.tz is None:
+    raw[COL_DT] = raw[COL_DT].dt.tz_localize("Europe/Paris")
+else:
+    raw[COL_DT] = raw[COL_DT].dt.tz_convert("Europe/Paris")
+
+df = raw.dropna(subset=[COL_PDL, COL_DT, COL_PWR]).copy()
+
+df[COL_PWR] = pd.to_numeric(df[COL_PWR], errors="coerce")
+df = df.dropna(subset=[COL_PWR])
+
+df.head()
+
+#exploration initiale
+
+print("n_rows:", len(df))
+print("n_clients:", df[COL_PDL].nunique())
+print(df.dtypes)
+
+#on passe en conso journalière et on crée la cible
+
+df["date"] = df[COL_DT].dt.floor("D")
+
+df_daily = (
+    df.groupby([COL_PDL, "date"])[COL_PWR]
+    .mean()  # ou sum selon ton pas de temps
+    .reset_index()
+)
+df_daily = df_daily.sort_values(["pdl_id", "date"])
+
+df_daily["conso_kwh"] = df_daily.groupby("pdl_id")[COL_PWR].transform(lambda x: x)
+
+# Feature engineering
+
+df_daily["lag1"] = df_daily.groupby("pdl_id")["conso_kwh"].shift(1)
+df_daily["lag7"] = df_daily.groupby("pdl_id")["conso_kwh"].shift(7)
+
+df_daily["mean_7"] = (
+    df_daily.groupby("pdl_id")["conso_kwh"]
+    .shift(1)
+    .rolling(7)
+    .mean()
+)
+
+df_daily["jour_semaine"] = df_daily["date"].dt.dayofweek
+df_daily["mois"] = df_daily["date"].dt.month
+df_daily["weekend"] = (df_daily["jour_semaine"] >= 5).astype(int)
+
+# modèle de regression lineaire
+
+from sklearn.linear_model import LinearRegression
+
+df_model = df_daily.dropna()
+
+features = ["lag1", "lag7", "mean_7", "jour_semaine", "mois", "weekend"]
+
+X = df_model[features]
+y = df_model["conso_kwh"]
+
+model = LinearRegression()
+model.fit(X, y)
