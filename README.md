@@ -1,2 +1,1 @@
-# M1EDE
-Un maximum d'amusement en data et énergie 
+# Projet M1EDE - Romane
