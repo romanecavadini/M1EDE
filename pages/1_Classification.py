@@ -61,6 +61,11 @@ with tab1:
     df_feats = prepare_kmeans_features(df_raw)
     k        = st.slider("Nombre de clusters (k)", 2, 8, 3)
 
+    # Selectbox client AVANT le bouton
+    labels_df_pre = load_labels()
+    labels_df_pre['id'] = labels_df_pre['id'].astype(str)
+    client_id = st.selectbox("🔍 Recherche par client", labels_df_pre['id'].tolist())
+
     if st.button("Lancer le clustering"):
         with st.spinner("Clustering en cours..."):
             scaler   = StandardScaler()
@@ -72,7 +77,6 @@ with tab1:
             df_feats['cluster'] = clusters
             df_feats.index = df_feats.index.astype(str)
 
-            # Croisement avec les vrais labels
             labels_df = load_labels()
             labels_df['id'] = labels_df['id'].astype(str)
             df_feats_labeled = df_feats.join(labels_df.set_index('id')[['label']], how='left')
@@ -80,14 +84,11 @@ with tab1:
 
         st.metric("Score de Silhouette", f"{sil:.3f}", help="Plus proche de 1 = meilleure séparation")
 
-        # ── Recherche par client ──
-        st.divider()
-        st.subheader("🔍 Recherche par client")
-        client_id = st.selectbox("Sélectionne un client", df_feats_labeled.index.tolist())
-        row = df_feats_labeled.loc[client_id]
-        col_a, col_b = st.columns(2)
-        col_a.metric("Cluster assigné", f"Cluster {int(row['cluster'])}")
-        col_b.metric("Type de résidence", row['type'] if pd.notna(row.get('type')) else "Inconnu")
+        if client_id in df_feats_labeled.index:
+            row = df_feats_labeled.loc[client_id]
+            col_a, col_b = st.columns(2)
+            col_a.metric("Cluster assigné", f"Cluster {int(row['cluster'])}")
+            col_b.metric("Type de résidence", row['type'] if pd.notna(row.get('type')) else "Inconnu")
 
         st.divider()
 
