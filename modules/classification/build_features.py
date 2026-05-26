@@ -15,7 +15,7 @@ from pathlib import Path
 try:
     script_dir = Path(__file__).resolve().parent
 except NameError:
-    script_dir = Path.cwd() / "M1EDE" / "Code"
+    script_dir = Path.cwd() / "modules" / "classification"
 
 raw_dataset = script_dir / ".." / ".." / "data" / "RES2-6-9.csv"
 cache_path  = script_dir / ".." / ".." / "data" / "features_cache.pkl"
@@ -29,7 +29,7 @@ COL_DT  = "datetime"
 COL_PWR = "p_kw"
 
 print("⏳ Chargement du CSV (opération longue)...")
-raw = pd.read_csv(raw_dataset, sep=';', decimal='.')
+raw = pd.read_csv(raw_dataset, sep=',', decimal='.')
 raw = raw.rename(columns={"ID": COL_PDL, "id": COL_PDL,
                            "horodate": COL_DT, "valeur": COL_PWR})
 
