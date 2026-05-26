@@ -1,25 +1,31 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
+import streamlit as st
 import plotly.graph_objects as go
+from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+DATA_PATH  = Path("data/export.csv")
+CACHE_PATH = Path("data/rf_prepared.pkl")
+
+FEATURES = [
+    'id_encoded', 'lag_1', 'lag_2', 'lag_48', 'lag_336',
+    'sin_hour', 'cos_hour', 'sin_day', 'cos_day', 'sin_month', 'cos_month'
+]
+
 st.title("📈 Prévision de consommation")
 
-@st.cache_data
+# ── Cache disque : chargé une fois pour toutes ──
+@st.cache_resource
 def load_data():
-    df = pd.read_csv("data/export.csv")
+    if CACHE_PATH.exists():
+        return pd.read_pickle(CACHE_PATH)
+    df = pd.read_csv(DATA_PATH)
     df['horodate'] = pd.to_datetime(df['horodate'], utc=True, errors='coerce')
-    df = df.dropna(subset=['horodate'])
-    df = df.sort_values(['id', 'horodate'])
-    return df
-
-@st.cache_data
-def prepare_features(df):
-    df = df.copy()
+    df = df.dropna(subset=['horodate']).sort_values(['id', 'horodate'])
     df['id_encoded'] = df['id'].astype('category').cat.codes
     df['lag_1']   = df.groupby('id')['valeur'].shift(1)
     df['lag_2']   = df.groupby('id')['valeur'].shift(2)
@@ -32,80 +38,121 @@ def prepare_features(df):
     df['cos_day']   = np.cos(2 * np.pi * df['horodate'].dt.dayofweek / 7)
     df['sin_month'] = np.sin(2 * np.pi * df['horodate'].dt.month / 12)
     df['cos_month'] = np.cos(2 * np.pi * df['horodate'].dt.month / 12)
-    return df.dropna()
+    df = df.dropna()
+    df.to_pickle(CACHE_PATH)
+    return df
 
-FEATURES   = ['id_encoded','lag_1','lag_2','lag_48','lag_336',
-               'sin_hour','cos_hour','sin_day','cos_day','sin_month','cos_month']
-SPLIT_DATE = "2024-09-01"
-
-@st.cache_resource
-def train_random_forest(_df):
-    train_df = _df[_df['horodate'] < SPLIT_DATE]
-    test_df  = _df[_df['horodate'] >= SPLIT_DATE]
+# ── Modèles ──
+def run_random_forest(df, client_id, start_of_week):
+    df_client   = df[df['id'] == client_id]
+    start_test  = pd.to_datetime(start_of_week, utc=True)
+    end_test    = start_test + pd.Timedelta(days=7)
+    start_train = start_test - pd.Timedelta(days=14)
+    train_df = df_client[(df_client['horodate'] >= start_train) & (df_client['horodate'] < start_test)]
+    test_df  = df_client[(df_client['horodate'] >= start_test)  & (df_client['horodate'] < end_test)]
+    if train_df.empty or test_df.empty:
+        return None
     rf = RandomForestRegressor(n_estimators=100, max_depth=15, random_state=42, n_jobs=-1)
     rf.fit(train_df[FEATURES], train_df['valeur'])
-    return rf, test_df
+    y_pred = rf.predict(test_df[FEATURES])
+    return {
+        "y_true": test_df['valeur'].values,
+        "y_pred": y_pred,
+        "mae":    mean_absolute_error(test_df['valeur'], y_pred),
+        "rmse":   np.sqrt(mean_squared_error(test_df['valeur'], y_pred)),
+        "dates":  test_df['horodate'].values
+    }
 
-@st.cache_resource
-def train_neural_network(_df):
-    train_df = _df[_df['horodate'] < SPLIT_DATE]
-    test_df  = _df[_df['horodate'] >= SPLIT_DATE]
-
+def run_mlp(df, client_id, start_of_week):
+    df_client   = df[df['id'] == client_id]
+    start_test  = pd.to_datetime(start_of_week, utc=True)
+    end_test    = start_test + pd.Timedelta(days=7)
+    start_train = start_test - pd.Timedelta(days=14)
+    train_df = df_client[(df_client['horodate'] >= start_train) & (df_client['horodate'] < start_test)]
+    test_df  = df_client[(df_client['horodate'] >= start_test)  & (df_client['horodate'] < end_test)]
+    if train_df.empty or test_df.empty:
+        return None
     scaler_X = MinMaxScaler()
     scaler_y = MinMaxScaler()
-
-    X_train = scaler_X.fit_transform(train_df[FEATURES].values)
-    y_train = scaler_y.fit_transform(train_df['valeur'].values.reshape(-1,1)).flatten()
-
-    mlp = MLPRegressor(
-        hidden_layer_sizes=(64, 32, 16),
-        activation='relu',
-        max_iter=50,
-        random_state=42,
-        verbose=False
-    )
+    X_train  = scaler_X.fit_transform(train_df[FEATURES].values)
+    y_train  = scaler_y.fit_transform(train_df['valeur'].values.reshape(-1,1)).flatten()
+    mlp = MLPRegressor(hidden_layer_sizes=(64, 32, 16), activation='relu', max_iter=50, random_state=42)
     mlp.fit(X_train, y_train)
-    return mlp, scaler_X, scaler_y, test_df
+    X_test = scaler_X.transform(test_df[FEATURES].values)
+    y_pred = scaler_y.inverse_transform(mlp.predict(X_test).reshape(-1,1)).flatten()
+    return {
+        "y_true": test_df['valeur'].values,
+        "y_pred": y_pred,
+        "mae":    mean_absolute_error(test_df['valeur'], y_pred),
+        "rmse":   np.sqrt(mean_squared_error(test_df['valeur'], y_pred)),
+        "dates":  test_df['horodate'].values
+    }
+
+def run_arima(df, client_id, start_of_week):
+    from statsmodels.tsa.arima.model import ARIMA
+    import warnings
+    warnings.filterwarnings('ignore')
+    df_client = df[df['id'] == client_id].copy()
+    df_client = df_client.set_index('horodate')[['valeur']]
+    ts = df_client['valeur'].resample('30min').mean().ffill()
+    start_test  = pd.to_datetime(start_of_week, utc=True)
+    end_test    = start_test + pd.Timedelta(days=7)
+    start_train = start_test - pd.Timedelta(days=14)
+    train = ts[(ts.index >= start_train) & (ts.index < start_test)]
+    test  = ts[(ts.index >= start_test)  & (ts.index < end_test)]
+    if len(train) < 10 or len(test) == 0:
+        return None
+    model      = ARIMA(train, order=(2, 0, 2), seasonal_order=(1, 0, 1, 48))
+    model_fit  = model.fit()
+    predictions = model_fit.forecast(steps=len(test))
+    return {
+        "y_true": test.values,
+        "y_pred": predictions.values,
+        "mae":    mean_absolute_error(test.values, predictions.values),
+        "rmse":   np.sqrt(mean_squared_error(test.values, predictions.values)),
+        "dates":  test.index
+    }
 
 # ── Interface ──
-df_raw  = load_data()
-df_feat = prepare_features(df_raw)
+df_prepared = load_data()
 
-modele    = st.selectbox("Modèle", ["Random Forest", "Réseau de neurones"])
-client_id = st.selectbox("Client", df_raw['id'].unique())
+modele          = st.selectbox("Modèle", ["Random Forest", "Réseau de neurones", "ARIMA"])
+selected_client = st.selectbox("👤 Client", df_prepared['id'].unique())
 
-if st.button("Lancer la prévision"):
+st.subheader("🗓️ Semaine à prédire")
+chosen_date   = st.date_input("Sélectionnez un jour")
+start_of_week = pd.to_datetime(chosen_date) - pd.Timedelta(days=chosen_date.weekday())
+end_of_week   = start_of_week + pd.Timedelta(days=7)
+st.info(f"Semaine cible : du **{start_of_week.strftime('%Y-%m-%d')}** au **{end_of_week.strftime('%Y-%m-%d')}** — entraîné sur les 2 semaines précédentes")
 
-    if modele == "Random Forest":
-        with st.spinner("Entraînement Random Forest (une seule fois)..."):
-            model, test_df = train_random_forest(df_feat)
-        client_data = test_df[test_df['id'] == client_id]
-        if not client_data.empty:
-            y_true = client_data['valeur'].values
-            y_pred = model.predict(client_data[FEATURES])
+if st.button("🚀 Lancer la prévision"):
+    with st.spinner("Calcul en cours..."):
+        if modele == "Random Forest":
+            results = run_random_forest(df_prepared, selected_client, start_of_week)
+        elif modele == "Réseau de neurones":
+            results = run_mlp(df_prepared, selected_client, start_of_week)
+        else:
+            results = run_arima(df_prepared, selected_client, start_of_week)
 
+    if results is None:
+        st.error("❌ Données insuffisantes pour ce client sur cette période. Essaie une autre semaine.")
     else:
-        with st.spinner("Entraînement réseau de neurones (une seule fois)..."):
-            model, scaler_X, scaler_y, test_df = train_neural_network(df_feat)
-        client_data = test_df[test_df['id'] == client_id]
-        if not client_data.empty:
-            y_true = client_data['valeur'].values
-            X_scaled = scaler_X.transform(client_data[FEATURES].values)
-            y_pred_scaled = model.predict(X_scaled)
-            y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1,1)).flatten()
-
-    if client_data.empty:
-        st.warning("Ce client n'a pas de données dans la période de test.")
-    else:
-        mae  = mean_absolute_error(y_true, y_pred)
-        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+        col1, col2 = st.columns(2)
+        col1.metric("MAE",  f"{results['mae']:.4f}")
+        col2.metric("RMSE", f"{results['rmse']:.4f}")
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(y=y_true[:200], name="Réel",   line=dict(color="black", width=2)))
-        fig.add_trace(go.Scatter(y=y_pred[:200], name="Prédit", line=dict(color="royalblue", dash="dash")))
-        fig.update_layout(title=f"{modele} — Client {client_id}", hovermode="x unified")
+        fig.add_trace(go.Scatter(
+            x=results['dates'], y=results['y_true'],
+            name="Réel", line=dict(color="black", width=2)
+        ))
+        fig.add_trace(go.Scatter(
+            x=results['dates'], y=results['y_pred'],
+            name="Prédit", line=dict(color="royalblue", dash="dash")
+        ))
+        fig.update_layout(
+            title=f"{modele} — Client {selected_client}",
+            xaxis_title="Date", yaxis_title="Consommation (kWh)",
+            hovermode="x unified"
+        )
         st.plotly_chart(fig, use_container_width=True)
-
-        col1, col2 = st.columns(2)
-        col1.metric("MAE",  f"{mae:.4f}")
-        col2.metric("RMSE", f"{rmse:.4f}")
