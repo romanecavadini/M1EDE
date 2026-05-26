@@ -1,3 +1,39 @@
+import pandas as pd
+
+# Load your dataset from 'res.csv' using the 'python' engine and skipping bad lines
+df_daily = pd.read_csv('res.csv', engine='python', on_bad_lines='skip')
+
+print("Dataset 'res.csv' loaded into df_daily (bad lines skipped):")
+display(df_daily.head())
+
+# processing df_daily for Prediction Algorithm (je ne sais pas s'il faut le refaire à chaque fois ou si on garde le df_model)
+#This section transforms the df_daily DataFrame loaded from res.csv to match the schema expected by the prediction and visualization algorithm. It involves renaming columns, converting data types, and engineering new features like lagged values and time-based indicators.
+
+# Rename columns to match the expected format
+df_daily = df_daily.rename(columns={'id': 'pdl_id', 'horodate': 'date', 'valeur': 'conso_kwh'})
+
+# Convert 'date' column to datetime objects, handling potential parsing errors and timezones
+df_daily['date'] = pd.to_datetime(df_daily['date'], errors='coerce', utc=True)
+
+# Sort by pdl_id and date, which is crucial for lag calculations
+df_daily = df_daily.sort_values(by=['pdl_id', 'date']).reset_index(drop=True)
+
+# Extract time-based features
+df_daily['jour_semaine'] = df_daily['date'].dt.dayofweek # Monday=0, Sunday=6
+df_daily['mois'] = df_daily['date'].dt.month
+df_daily['weekend'] = df_daily['date'].dt.weekday // 5 # 0 for weekday, 1 for weekend
+
+# Calculate lagged features and rolling mean, grouped by 'pdl_id'
+df_daily['lag1'] = df_daily.groupby('pdl_id')['conso_kwh'].shift(1)
+df_daily['lag7'] = df_daily.groupby('pdl_id')['conso_kwh'].shift(7)
+df_daily['mean_7'] = df_daily.groupby('pdl_id')['conso_kwh'].rolling(window=7, min_periods=1).mean().reset_index(level=0, drop=True)
+
+# Display the preprocessed DataFrame head and info
+print("Preprocessed df_daily head:")
+display(df_daily.head())
+print("\nPreprocessed df_daily info:")
+df_daily.info()
+
 # =========================
 # PRÉDICTIONS + VISUALISATION (CORRIGÉ)
 # =========================
