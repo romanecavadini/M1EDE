@@ -40,3 +40,6 @@ desktop.ini
 .env
 .vscode/
 .idea/
+data/export.csv
+data/RES2-6-9.csv
+data/rf_prepared.pkl
