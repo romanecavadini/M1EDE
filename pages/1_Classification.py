@@ -121,8 +121,7 @@ with tab2:
     st.markdown("Prédit si un foyer est une **résidence principale (0)** ou **secondaire (1)** à partir des labels connus.")
 
     modele = st.selectbox("Modèle", [
-        "Régression Logistique v1 (Romane)",
-        "Régression Logistique v2 (Romane)",
+        "Régression Logistique (Romane)",
         "Random Forest (Arthur)",
     ])
 
