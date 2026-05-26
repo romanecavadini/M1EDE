@@ -218,3 +218,13 @@ for client_id in clients_to_plot:
     plt.legend()
 
     plt.show()
+def run(df, client_id):
+    # utilise le code existant mais avec df en paramètre
+    # remplace les pd.read_csv par le df passé en argument
+    ...
+    return {
+        "y_true": y_true,
+        "y_pred": y_pred,
+        "mae": mae,
+        "rmse": rmse
+    }

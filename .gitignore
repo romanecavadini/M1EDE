@@ -22,7 +22,7 @@ include/
 
 # --- Données (Data) ---
 # On ignore les fichiers de données lourds (souvent >100Mo ou locaux)
-*.csv
+# *.csv
 *.xlsx
 *.parquet
 *.json
