@@ -113,6 +113,49 @@ def run_arima(df, client_id, start_of_week):
         "dates":  test.index
     }
 
+
+def run_linear_regression(df, client_id, start_of_week):
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+    # Préparation des données journalières
+    df_client = df[df["id"] == client_id].copy()
+    df_client = df_client.set_index("horodate")[["valeur"]]
+    df_daily  = df_client["valeur"].resample("D").sum().reset_index()
+    df_daily.columns = ["date", "conso_kwh"]
+    df_daily["pdl_id"]       = client_id
+    df_daily["jour_semaine"] = df_daily["date"].dt.dayofweek
+    df_daily["mois"]         = df_daily["date"].dt.month
+    df_daily["weekend"]      = df_daily["date"].dt.weekday // 5
+    df_daily["lag1"]         = df_daily["conso_kwh"].shift(1)
+    df_daily["lag7"]         = df_daily["conso_kwh"].shift(7)
+    df_daily["mean_7"]       = df_daily["conso_kwh"].rolling(window=7, min_periods=1).mean()
+    df_daily = df_daily.dropna()
+
+    start_test  = pd.to_datetime(start_of_week, utc=False)
+    end_test    = start_test + pd.Timedelta(days=7)
+    cutoff      = start_test
+
+    train = df_daily[df_daily["date"] < cutoff]
+    test  = df_daily[(df_daily["date"] >= cutoff) & (df_daily["date"] < end_test)]
+
+    if train.empty or test.empty:
+        return None
+
+    features = ["lag1", "lag7", "mean_7", "jour_semaine", "mois", "weekend"]
+    model    = LinearRegression()
+    model.fit(train[features], train["conso_kwh"])
+    y_pred   = model.predict(test[features])
+    y_true   = test["conso_kwh"].values
+
+    return {
+        "y_true": y_true,
+        "y_pred": y_pred,
+        "mae":    mean_absolute_error(y_true, y_pred),
+        "rmse":   np.sqrt(mean_squared_error(y_true, y_pred)),
+        "dates":  test["date"].values
+    }
+
 # ── Interface ──
 df_prepared = load_data()
 
@@ -131,8 +174,10 @@ if st.button("🚀 Lancer la prévision"):
             results = run_random_forest(df_prepared, selected_client, start_of_week)
         elif modele == "Réseau de neurones":
             results = run_mlp(df_prepared, selected_client, start_of_week)
-        else:
+        elif modele == "ARIMA":
             results = run_arima(df_prepared, selected_client, start_of_week)
+        else:
+            results = run_linear_regression(df_prepared, selected_client, start_of_week)
 
     if results is None:
         st.error("❌ Données insuffisantes pour ce client sur cette période. Essaie une autre semaine.")
