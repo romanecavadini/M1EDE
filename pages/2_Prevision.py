@@ -159,7 +159,7 @@ def run_linear_regression(df, client_id, start_of_week):
 # ── Interface ──
 df_prepared = load_data()
 
-modele          = st.selectbox("Modèle", ["Random Forest", "Réseau de neurones", "ARIMA"])
+modele          = st.selectbox("Modèle", ["Random Forest", "Réseau de neurones", "ARIMA", "Régression Linéaire (Salma)"])
 selected_client = st.selectbox("👤 Client", df_prepared['id'].unique())
 
 st.subheader("🗓️ Semaine à prédire")
