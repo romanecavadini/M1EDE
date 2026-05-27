@@ -132,7 +132,7 @@ def run_linear_regression(df, client_id, start_of_week):
     df_daily["mean_7"]       = df_daily["conso_kwh"].rolling(window=7, min_periods=1).mean()
     df_daily = df_daily.dropna()
 
-    start_test  = pd.to_datetime(start_of_week, utc=False)
+    start_test  = pd.to_datetime(start_of_week, utc=True)
     end_test    = start_test + pd.Timedelta(days=7)
     cutoff      = start_test
 
