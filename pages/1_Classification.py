@@ -57,6 +57,26 @@ with tab1:
     st.subheader("KMeans — Regroupement non supervisé des foyers")
     st.markdown("Regroupe les foyers selon leurs patterns de consommation **sans utiliser les labels**.")
 
+    with st.expander("📖 Contexte et choix méthodologiques"):
+        st.markdown("""
+        **Pourquoi KMeans ?**
+        KMeans est un algorithme de clustering non supervisé vu en cours, simple et efficace pour 
+        partitionner des données en k groupes homogènes. Il est particulièrement adapté ici car 
+        on cherche à regrouper les foyers selon leurs patterns de consommation sans utiliser les labels.
+
+        **Features construites :**
+        Plutôt que d'utiliser directement les séries temporelles brutes (trop volumineuses), 
+        nous avons construit des features résumant le comportement de chaque foyer :
+        - **Taux de faible consommation** : proportion de jours avec une consommation < 20% de la moyenne
+        - **Variabilité** : écart-type normalisé de la consommation
+        - **Taux de jours inactifs** : proportion de jours quasi sans consommation
+        - **Stabilité** : ratio min/max de la consommation journalière
+
+        **Résultats :** Pour k=5, le score de silhouette est de **0.379**, ce qui indique une 
+        séparation modérée des clusters. Ce score relativement faible s'explique par la nature 
+        continue des comportements de consommation — la frontière entre RP et RS n'est pas toujours nette.
+        """)
+
     df_raw   = load_data()
     df_feats = prepare_kmeans_features(df_raw)
     k        = st.slider("Nombre de clusters (k)", 2, 8, 3)
@@ -139,6 +159,30 @@ with tab1:
 with tab2:
     st.subheader("Classification supervisée — Résidence principale vs secondaire")
     st.markdown("Prédit si un foyer est une **résidence principale (0)** ou **secondaire (1)**.")
+
+    with st.expander("📖 Contexte et choix méthodologiques"):
+        st.markdown("""
+        **Problématique du déséquilibre de classes**
+        Le dataset est très déséquilibré : **86% de résidences principales** vs **14% de secondaires**. 
+        Un modèle naïf qui prédit tout en "principale" obtient déjà 86% d'accuracy — ce qui est trompeur.
+        C'est pourquoi nous utilisons le **F1-score** et l'**AUC-ROC** comme métriques principales,
+        et nous avons introduit un **seuil ajustable** pour mieux détecter les résidences secondaires.
+
+        **Pourquoi abaisser le seuil ?**
+        Par défaut, un modèle prédit "secondaire" si la probabilité dépasse 0.5. En abaissant ce seuil 
+        (ex. 0.2), on rend le modèle plus sensible aux résidences secondaires au prix de plus de 
+        faux positifs. C'est un compromis à ajuster selon l'usage.
+
+        **Comparaison des modèles :**
+        - **Régression Logistique** : implémentée from scratch avec descente de gradient. 
+          AUC = 1.0 (suspect — possible data leakage car les labels viennent du clustering).
+          F1 = 0 à seuil 0.5 (tout prédit en principale).
+        - **Random Forest** (Arthur) : accuracy = 0.960, F1 = 0.875, AUC = 0.998. 
+          Meilleur modèle grâce à l'ensemble de 4 sous-modèles avec undersampling.
+
+        > ⚠️ Les AUC proches de 1 sont suspects car les labels ont été construits par clustering 
+        sur les mêmes données — il peut y avoir une fuite d'information.
+        """)
 
     modele = st.selectbox("Modèle", ["Régression Logistique (Romane)", "Random Forest (Arthur)"])
 

@@ -18,6 +18,33 @@ FEATURES = [
 
 st.title("📈 Prévision de consommation")
 
+with st.expander("📖 Contexte et choix méthodologiques"):
+    st.markdown("""
+    **Objectif :** Prédire la consommation d'un client sur une semaine cible, 
+    en s'entraînant sur les 2 semaines précédentes.
+
+    **Features utilisées (RF et MLP) :**
+    - Lags temporels : consommation à t-1, t-2, t-48 (même heure la veille), t-336 (même heure la semaine précédente)
+    - Features cycliques : sin/cos de l'heure, du jour de la semaine et du mois
+
+    **Comparaison des modèles :**
+
+    | Modèle | MAE | RMSE | Commentaire |
+    |--------|-----|------|-------------|
+    | Random Forest | 221.7 | 333.5 | Meilleur modèle — capture bien les non-linéarités |
+    | Réseau de neurones (MLP) | 234.0 | 342.0 | Proche du RF, sklearn MLPRegressor |
+    | ARIMA | 476.0 | 589.0 | Modèle statistique, moins adapté aux longues séries |
+    | Régression Linéaire (Salma) | 6967 | 7894 | Travaille sur kWh journaliers (unité différente) |
+
+    **Pourquoi le Random Forest est meilleur ?**
+    Il capture mieux les non-linéarités et les interactions entre features que la régression linéaire.
+    ARIMA est limité car il ne modélise pas bien la saisonnalité complexe des séries de consommation.
+    Le MLP est comparable au RF mais plus lent à entraîner.
+
+    > ⚠️ La régression linéaire de Salma n'est pas directement comparable aux autres car elle 
+    prédit la **consommation journalière totale** (kWh/jour) et non la puissance au pas de 30 min.
+    """)
+
 # ── Cache disque : chargé une fois pour toutes ──
 @st.cache_resource
 def load_data():
