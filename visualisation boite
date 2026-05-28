@@ -1,0 +1,47 @@
+# Statistical Visualizations: Box Plots for Hourly and Daily Patterns
+# These box plots help visualize the distribution of consumption over different hours of the day and days of the week, allowing you to identify typical consumption ranges, medians, and outliers for the entire dataset.
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Prepare data for time-based analysis (hourly and daily patterns)
+# We need to flatten df_daily into a long format where 'horodate' is a column
+
+# First, reset index of df_daily to make 'id' a regular column
+df_flat = df_daily.reset_index()
+
+# Melt the DataFrame to have 'id', 'horodate', and 'value' columns
+df_long = df_flat.melt(id_vars='id', var_name='horodate', value_name='consumption')
+
+# Ensure 'horodate' is datetime and extract time features
+df_long['horodate'] = pd.to_datetime(df_long['horodate'])
+df_long['hour_of_day'] = df_long['horodate'].dt.hour
+df_long['day_of_week'] = df_long['horodate'].dt.day_name() # Use day names for better readability
+
+# Merge with df_results to get consumer type
+df_long = df_long.merge(df_results[['consumer_type']], left_on='id', right_index=True, how='left')
+
+# --- Box Plot: Consumption Distribution by Hour of Day ---
+plt.figure(figsize=(16, 7))
+sns.boxplot(x='hour_of_day', y='consumption', data=df_long, hue='consumer_type', palette='viridis')
+plt.title('Consumption Distribution by Hour of Day for Principale vs. Secondaire Residences')
+plt.xlabel('Hour of Day')
+plt.ylabel('Consumption (Value)')
+plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+plt.legend(title='Consumer Type')
+plt.tight_layout()
+plt.show()
+
+# --- Box Plot: Consumption Distribution by Day of Week ---
+# Define order for days of the week
+day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+plt.figure(figsize=(16, 7))
+sns.boxplot(x='day_of_week', y='consumption', data=df_long, hue='consumer_type', order=day_order, palette='plasma')
+plt.title('Consumption Distribution by Day of Week for Principale vs. Secondaire Residences')
+plt.xlabel('Day of Week')
+plt.ylabel('Consumption (Value)')
+plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+plt.legend(title='Consumer Type')
+plt.tight_layout()
+plt.show()

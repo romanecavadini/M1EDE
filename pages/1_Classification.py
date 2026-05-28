@@ -142,6 +142,10 @@ with tab2:
 
     modele = st.selectbox("Modèle", ["Régression Logistique (Romane)", "Random Forest (Arthur)"])
 
+    # Selectbox client AVANT le bouton
+    labels_pre = load_labels()
+    client_choisi = st.selectbox("🔍 Client à classifier", labels_pre['id'].tolist())
+
     def sigmoid(z):
         return 1 / (1 + np.exp(-np.clip(z, -500, 500)))
 
@@ -216,10 +220,46 @@ with tab2:
         auc = roc_auc_score(y_test, proba)
         acc = (y_pred == y_test).mean()
 
+        # ── Résultat pour le client choisi ──
+        labels_full = load_labels()
+        labels_full['id'] = labels_full['id'].astype(str)
+        client_str = str(client_choisi)
+        if client_str in labels_full['id'].values:
+            row_client = labels_full[labels_full['id'] == client_str].iloc[0]
+            cluster_client = row_client['cluster']
+            X_all = pd.get_dummies(labels_full['cluster'], prefix='cluster').values
+            y_all = labels_full['label'].values
+            X_all = np.hstack([np.ones((X_all.shape[0], 1)), X_all])
+            def sigmoid_local(z):
+                return 1 / (1 + np.exp(-np.clip(z, -500, 500)))
+            def fit_local(X, y, lr=0.01, n_iter=1000):
+                beta = np.zeros(X.shape[1])
+                for _ in range(n_iter):
+                    p_hat = sigmoid_local(X @ beta)
+                    beta -= lr * (X.T @ (p_hat - y) / len(y))
+                return beta
+            beta_client = fit_local(X_all, y_all)
+            X_client = pd.get_dummies(
+                pd.Series([cluster_client], name='cluster'), prefix='cluster'
+            ).reindex(columns=pd.get_dummies(labels_full['cluster'], prefix='cluster').columns, fill_value=0).values
+            X_client = np.hstack([np.ones((1, 1)), X_client]).astype(float)
+            beta_client = beta_client.astype(float)
+            proba_client = sigmoid_local(X_client @ beta_client)[0]
+            pred_client = "🏖️ Résidence Secondaire" if proba_client >= seuil else "🏠 Résidence Principale"
+            vrai_label  = "🏖️ Résidence Secondaire" if row_client['label'] == 1 else "🏠 Résidence Principale"
+
+            st.divider()
+            st.subheader(f"🔍 Résultat pour le client {client_choisi}")
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("Prédiction", pred_client)
+            col_b.metric("Vrai label", vrai_label)
+            col_c.metric("Probabilité secondaire", f"{proba_client:.2%}")
+            st.divider()
+
         col1, col2, col3 = st.columns(3)
-        col1.metric("Accuracy", f"{acc:.3f}")
-        col2.metric("F1-Score", f"{f1:.3f}")
-        col3.metric("AUC-ROC",  f"{auc:.3f}")
+        col1.metric("Accuracy (globale)", f"{acc:.3f}")
+        col2.metric("F1-Score (global)", f"{f1:.3f}")
+        col3.metric("AUC-ROC (global)",  f"{auc:.3f}")
 
         col_left, col_right = st.columns(2)
 

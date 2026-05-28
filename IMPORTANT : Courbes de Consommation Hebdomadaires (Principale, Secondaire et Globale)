@@ -1,0 +1,22 @@
+# Modifiez la date de début de la semaine que vous souhaitez analyser
+start_date_for_plot = '2023-11-08' # Exemple: Semaine commençant le 8 novembre 2023
+
+# Modifiez la fréquence de rééchantillonnage ('h' pour horaire, 'D' pour journalier, etc.)
+# Utilisation de 'D' (journalier) pour lisser les 'pics' horaires
+resample_freq_for_plot = 'D'
+
+print(f"Génération des courbes de consommation pour la semaine commençant le {start_date_for_plot} avec un pas de temps {resample_freq_for_plot}:")
+
+plot_weekly_consumption_comparison(
+    df_daily,
+    df_results,
+    ['Principale', 'Secondaire'],
+    start_date_str=start_date_for_plot,
+    resample_freq=resample_freq_for_plot,
+    colors=['blue', 'red', 'green'], # Bleu pour Principale, Rouge pour Secondaire, Vert pour Global
+    agg_method='sum',
+    show_error_bands=False,
+    plot_global_consumption=True # Afficher la courbe de consommation globale
+)
+
+print("\nN'hésitez pas à modifier `start_date_for_plot` et `resample_freq_for_plot` pour explorer d'autres périodes et granularités !")
