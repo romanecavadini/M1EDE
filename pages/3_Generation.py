@@ -4,6 +4,20 @@ import pandas as pd
 import pickle
 import plotly.graph_objects as go
 from pathlib import Path
+import gdown
+import shutil
+from pathlib import Path
+
+def ensure_data():
+    Path("data").mkdir(exist_ok=True)
+    if not Path("data/export.csv").exists():
+        gdown.download("https://drive.google.com/uc?id=1aZUOVjMTAhSegI70kPmFjUtPWl644FhT", "data/export.csv", quiet=False)
+    if not Path("data/RES2-6-9.csv").exists():
+        shutil.copy("data/export.csv", "data/RES2-6-9.csv")
+
+ensure_data()
+
+
 
 st.set_page_config(layout="wide")
 st.title("🔄 Génération de courbes de consommation")

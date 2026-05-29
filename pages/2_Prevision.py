@@ -7,6 +7,20 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+import gdown
+import shutil
+from pathlib import Path
+
+def ensure_data():
+    Path("data").mkdir(exist_ok=True)
+    if not Path("data/export.csv").exists():
+        gdown.download("https://drive.google.com/uc?id=1aZUOVjMTAhSegI70kPmFjUtPWl644FhT", "data/export.csv", quiet=False)
+    if not Path("data/RES2-6-9.csv").exists():
+        shutil.copy("data/export.csv", "data/RES2-6-9.csv")
+
+ensure_data()
+
+
 
 DATA_PATH  = Path("data/export.csv")
 CACHE_PATH = Path("data/rf_prepared.pkl")

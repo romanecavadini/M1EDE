@@ -9,6 +9,20 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score, roc_curve
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+import gdown
+import shutil
+from pathlib import Path
+
+def ensure_data():
+    Path("data").mkdir(exist_ok=True)
+    if not Path("data/export.csv").exists():
+        gdown.download("https://drive.google.com/uc?id=1aZUOVjMTAhSegI70kPmFjUtPWl644FhT", "data/export.csv", quiet=False)
+    if not Path("data/RES2-6-9.csv").exists():
+        shutil.copy("data/export.csv", "data/RES2-6-9.csv")
+
+ensure_data()
+
+
 
 st.set_page_config(layout="wide")
 st.title("📊 Classification & Clustering des profils de consommation")
