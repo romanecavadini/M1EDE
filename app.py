@@ -9,8 +9,7 @@ def download_data():
     Path("data").mkdir(exist_ok=True)
     FILE_ID = "1aZUOVjMTAhSegI70kPmFjUtPWl644FhT"
     if not Path("data/export.csv").exists():
-        with st.spinner("Téléchargement des données depuis Google Drive..."):
-            gdown.download(f"https://drive.google.com/uc?id={FILE_ID}", "data/export.csv", quiet=False)
+        gdown.download(f"https://drive.google.com/uc?id={FILE_ID}", "data/export.csv", quiet=False)
     if not Path("data/RES2-6-9.csv").exists():
         shutil.copy("data/export.csv", "data/RES2-6-9.csv")
 
@@ -24,7 +23,6 @@ st.set_page_config(
 
 st.title("⚡ Dashboard Data & Énergie")
 st.markdown("**M1 Parcours Énergie — École des Ponts ParisTech**")
-
 st.divider()
 
 st.markdown("""
