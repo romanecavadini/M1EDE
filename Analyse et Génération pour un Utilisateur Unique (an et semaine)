@@ -1,0 +1,103 @@
+# Pour une analyse plus détaillée au niveau individuel, nous allons sélectionner un utilisateur au hasard et :
+
+# Extraire sa courbe de consommation réelle.
+# Générer une courbe synthétique qui représente le profil moyen de son type (Résidence Principale ou Secondaire).
+# Visualiser les deux courbes pour comparaison.
+# Calculer des indicateurs statistiques pour les deux courbes afin de quantifier leurs similitudes et différences.
+
+import numpy as np # Added import for numpy
+import matplotlib.pyplot as plt
+
+# Sélectionner un ID utilisateur aléatoire
+np.random.seed(42) # Pour la reproductibilité
+random_user_id = np.random.choice(df_daily.index)
+
+print(f"Utilisateur sélectionné au hasard: {random_user_id}")
+
+# Obtenir le type de consommateur pour cet ID
+user_consumer_type = df_results.loc[random_user_id, 'prediction_binaire']
+type_label = "Résidence Principale" if user_consumer_type == 0 else "Résidence Secondaire"
+print(f"Type de consommateur pour cet utilisateur: {type_label} ({user_consumer_type})")
+
+# Courbe de consommation réelle de l'utilisateur
+real_user_curve = df_daily.loc[[random_user_id]]
+
+# Générer une seule courbe synthétique pour le type de cet utilisateur
+synthetic_single_curve = generate_synthetic_curves(df_daily, df_results, consumer_type=user_consumer_type, num_curves=1, random_seed=100) # Nouvelle graine pour cette génération
+
+# Assurer que les colonnes sont des objets datetime pour le plotting si elles ont été converties en chaine de caractères après head()
+synthetic_single_curve.columns = pd.to_datetime(synthetic_single_curve.columns)
+real_user_curve.columns = pd.to_datetime(real_user_curve.columns)
+
+
+# --- Visualisation ---
+plt.figure(figsize=(15, 6))
+plt.plot(real_user_curve.columns, real_user_curve.iloc[0].values, label=f'Réel - Utilisateur {random_user_id} ({type_label})', color='blue')
+plt.plot(synthetic_single_curve.columns, synthetic_single_curve.iloc[0].values, label=f'Synthétique - Type {type_label}', linestyle='--', color='orange')
+
+plt.title(f'Comparaison: Courbe Réelle (ID: {random_user_id}) vs Courbe Synthétique ({type_label})')
+plt.xlabel('Date')
+plt.ylabel('Consommation (Valeur)')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# --- Calcul des indicateurs ---
+print("\n--- Indicateurs Comparatifs pour l'Utilisateur Unique ---")
+indicators_single_user = []
+indicators_single_user.append(calculate_consumption_indicators(real_user_curve, name=f'Réel Utilisateur {random_user_id}'))
+indicators_single_user.append(calculate_consumption_indicators(synthetic_single_curve, name=f'Synthétique Type {type_label}'))
+
+comparison_single_user_df = pd.DataFrame(indicators_single_user).set_index('Type')
+display(comparison_single_user_df)
+
+
+#même chose mais sur une semaine 
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Sélectionner un ID utilisateur aléatoire
+np.random.seed(42) # Pour la reproductibilité
+random_user_id_weekly = np.random.choice(df_weekly.index)
+
+print(f"Utilisateur sélectionné au hasard pour l'analyse hebdomadaire: {random_user_id_weekly}")
+
+# Obtenir le type de consommateur pour cet ID
+user_consumer_type_weekly = df_results.loc[random_user_id_weekly, 'prediction_binaire']
+type_label_weekly = "Résidence Principale" if user_consumer_type_weekly == 0 else "Résidence Secondaire"
+print(f"Type de consommateur pour cet utilisateur (hebdomadaire): {type_label_weekly} ({user_consumer_type_weekly})")
+
+# Courbe de consommation réelle hebdomadaire de l'utilisateur
+real_user_weekly_curve = df_weekly.loc[[random_user_id_weekly]]
+
+# Générer une seule courbe synthétique hebdomadaire pour le type de cet utilisateur
+synthetic_single_weekly_curve = generate_synthetic_weekly_curves(df_weekly, df_results, consumer_type=user_consumer_type_weekly, num_curves=1, random_seed=200) # Nouvelle graine
+
+# Assurer que les colonnes sont des objets datetime pour le plotting
+synthetic_single_weekly_curve.columns = pd.to_datetime(synthetic_single_weekly_curve.columns)
+real_user_weekly_curve.columns = pd.to_datetime(real_user_weekly_curve.columns)
+
+
+# --- Visualisation ---
+plt.figure(figsize=(15, 6))
+plt.plot(real_user_weekly_curve.columns, real_user_weekly_curve.iloc[0].values, label=f'Réel - Utilisateur {random_user_id_weekly} ({type_label_weekly})', color='blue')
+plt.plot(synthetic_single_weekly_curve.columns, synthetic_single_weekly_curve.iloc[0].values, label=f'Synthétique - Type {type_label_weekly} (Hebdomadaire)', linestyle='--', color='orange')
+
+plt.title(f'Comparaison Hebomadaire: Courbe Réelle (ID: {random_user_id_weekly}) vs Courbe Synthétique ({type_label_weekly})')
+plt.xlabel('Date')
+plt.ylabel('Consommation (Valeur)')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# --- Calcul des indicateurs ---
+print("\n--- Indicateurs Comparatifs pour l'Utilisateur Unique (Hebdomadaire) ---")
+indicators_single_user_weekly = []
+indicators_single_user_weekly.append(calculate_consumption_indicators(real_user_weekly_curve, name=f'Réel Utilisateur {random_user_id_weekly} (Hebdomadaire)'))
+indicators_single_user_weekly.append(calculate_consumption_indicators(synthetic_single_weekly_curve, name=f'Synthétique Type {type_label_weekly} (Hebdomadaire)'))
+
+comparison_single_user_weekly_df = pd.DataFrame(indicators_single_user_weekly).set_index('Type')
+display(comparison_single_user_weekly_df)
