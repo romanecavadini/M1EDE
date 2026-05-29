@@ -18,31 +18,26 @@ FEATURES = [
 
 st.title("📈 Prévision de consommation")
 
-with st.expander("📖 Contexte et choix méthodologiques"):
+with st.expander("Approche et résultats"):
     st.markdown("""
-    **Objectif :** Prédire la consommation d'un client sur une semaine cible, 
-    en s'entraînant sur les 2 semaines précédentes.
+    L'objectif est de prédire la consommation d'un client sur une semaine, en s'entraînant 
+    uniquement sur les deux semaines précédentes. Ce choix d'un historique court est volontaire : 
+    il force les modèles à capturer des patterns locaux récents plutôt que des tendances annuelles.
 
-    **Features utilisées (RF et MLP) :**
-    - Lags temporels : consommation à t-1, t-2, t-48 (même heure la veille), t-336 (même heure la semaine précédente)
-    - Features cycliques : sin/cos de l'heure, du jour de la semaine et du mois
+    Pour le Random Forest et le MLP, on a construit des features temporelles à partir des 
+    valeurs passées : consommation à t-1, t-2, même heure la veille (t-48) et même heure 
+    la semaine précédente (t-336). On a également ajouté des features cycliques (sin/cos de 
+    l'heure, du jour, du mois) pour que les modèles puissent capter la saisonnalité sans 
+    avoir à apprendre que l'heure 23 est proche de l'heure 0.
 
-    **Comparaison des modèles :**
+    Sur les données testées, le Random Forest obtient les meilleurs résultats (MAE 221.7, 
+    RMSE 333.5), suivi de près par le MLP (MAE 234, RMSE 342). ARIMA est nettement moins 
+    bon (MAE 476, RMSE 589) — il modélise bien les séries stationnaires mais peine à 
+    capturer la saisonnalité complexe des courbes de consommation résidentielle.
 
-    | Modèle | MAE | RMSE | Commentaire |
-    |--------|-----|------|-------------|
-    | Random Forest | 221.7 | 333.5 | Meilleur modèle — capture bien les non-linéarités |
-    | Réseau de neurones (MLP) | 234.0 | 342.0 | Proche du RF, sklearn MLPRegressor |
-    | ARIMA | 476.0 | 589.0 | Modèle statistique, moins adapté aux longues séries |
-    | Régression Linéaire (Salma) | 6967 | 7894 | Travaille sur kWh journaliers (unité différente) |
-
-    **Pourquoi le Random Forest est meilleur ?**
-    Il capture mieux les non-linéarités et les interactions entre features que la régression linéaire.
-    ARIMA est limité car il ne modélise pas bien la saisonnalité complexe des séries de consommation.
-    Le MLP est comparable au RF mais plus lent à entraîner.
-
-    > ⚠️ La régression linéaire de Salma n'est pas directement comparable aux autres car elle 
-    prédit la **consommation journalière totale** (kWh/jour) et non la puissance au pas de 30 min.
+    La régression linéaire de Salma n'est pas directement comparable : elle prédit la 
+    consommation journalière totale en kWh et non la puissance au pas de 30 minutes, 
+    ce qui explique des MAE et RMSE sans commune mesure avec les autres modèles.
     """)
 
 # ── Cache disque : chargé une fois pour toutes ──

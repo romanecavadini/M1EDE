@@ -57,24 +57,22 @@ with tab1:
     st.subheader("KMeans — Regroupement non supervisé des foyers")
     st.markdown("Regroupe les foyers selon leurs patterns de consommation **sans utiliser les labels**.")
 
-    with st.expander("📖 Contexte et choix méthodologiques"):
+    with st.expander("Approche et résultats"):
         st.markdown("""
-        **Pourquoi KMeans ?**
-        KMeans est un algorithme de clustering non supervisé vu en cours, simple et efficace pour 
-        partitionner des données en k groupes homogènes. Il est particulièrement adapté ici car 
-        on cherche à regrouper les foyers selon leurs patterns de consommation sans utiliser les labels.
+        On a choisi KMeans car c'est l'algorithme de clustering qu'on a vu en cours, et il correspondait 
+        bien à notre objectif : regrouper les foyers par profil de consommation sans utiliser les labels.
 
-        **Features construites :**
-        Plutôt que d'utiliser directement les séries temporelles brutes (trop volumineuses), 
-        nous avons construit des features résumant le comportement de chaque foyer :
-        - **Taux de faible consommation** : proportion de jours avec une consommation < 20% de la moyenne
-        - **Variabilité** : écart-type normalisé de la consommation
-        - **Taux de jours inactifs** : proportion de jours quasi sans consommation
-        - **Stabilité** : ratio min/max de la consommation journalière
+        Travailler directement sur les séries brutes (16 000 points par client) aurait été trop lourd. 
+        On a donc construit des features synthétiques qui résument le comportement de chaque foyer sur 
+        l'année : part des jours avec une consommation très faible, variabilité de la consommation, 
+        proportion de jours quasi inactifs, et stabilité du profil. Ces features permettent de capter 
+        ce qui distingue une résidence principale — occupée en permanence — d'une résidence secondaire, 
+        qui alterne entre des périodes d'activité intense et de quasi-inactivité.
 
-        **Résultats :** Pour k=5, le score de silhouette est de **0.379**, ce qui indique une 
-        séparation modérée des clusters. Ce score relativement faible s'explique par la nature 
-        continue des comportements de consommation — la frontière entre RP et RS n'est pas toujours nette.
+        Avec k=5, on obtient un score de silhouette de 0.379. Ce n'est pas excellent, mais c'est 
+        attendu : les comportements de consommation forment un continuum, et la frontière entre RP 
+        et RS n'est pas toujours nette — certains foyers principaux peu occupés ressemblent à des 
+        résidences secondaires.
         """)
 
     df_raw   = load_data()
@@ -160,28 +158,27 @@ with tab2:
     st.subheader("Classification supervisée — Résidence principale vs secondaire")
     st.markdown("Prédit si un foyer est une **résidence principale (0)** ou **secondaire (1)**.")
 
-    with st.expander("📖 Contexte et choix méthodologiques"):
+    with st.expander("Approche et résultats"):
         st.markdown("""
-        **Problématique du déséquilibre de classes**
-        Le dataset est très déséquilibré : **86% de résidences principales** vs **14% de secondaires**. 
-        Un modèle naïf qui prédit tout en "principale" obtient déjà 86% d'accuracy — ce qui est trompeur.
-        C'est pourquoi nous utilisons le **F1-score** et l'**AUC-ROC** comme métriques principales,
-        et nous avons introduit un **seuil ajustable** pour mieux détecter les résidences secondaires.
+        Le dataset est fortement déséquilibré : 86% des foyers sont des résidences principales, 
+        contre seulement 14% de résidences secondaires. Dans ce cas, l'accuracy seule est trompeuse — 
+        un modèle qui prédit systématiquement "principale" obtient déjà 86% sans rien apprendre. 
+        On s'est donc concentrés sur le F1-score et l'AUC-ROC, et on a introduit un seuil ajustable 
+        pour trouver le bon compromis entre détecter les RS et éviter trop de faux positifs.
 
-        **Pourquoi abaisser le seuil ?**
-        Par défaut, un modèle prédit "secondaire" si la probabilité dépasse 0.5. En abaissant ce seuil 
-        (ex. 0.2), on rend le modèle plus sensible aux résidences secondaires au prix de plus de 
-        faux positifs. C'est un compromis à ajuster selon l'usage.
+        La régression logistique a été implémentée from scratch par descente de gradient. 
+        Elle obtient une AUC de 1.0, ce qui est suspect — les labels ayant été construits par 
+        clustering sur les mêmes données, il y a probablement une fuite d'information. 
+        En pratique, à seuil 0.5, elle prédit tout en "principale" (F1 = 0), ce qui illustre 
+        bien le problème du déséquilibre.
 
-        **Comparaison des modèles :**
-        - **Régression Logistique** : implémentée from scratch avec descente de gradient. 
-          AUC = 1.0 (suspect — possible data leakage car les labels viennent du clustering).
-          F1 = 0 à seuil 0.5 (tout prédit en principale).
-        - **Random Forest** (Arthur) : accuracy = 0.960, F1 = 0.875, AUC = 0.998. 
-          Meilleur modèle grâce à l'ensemble de 4 sous-modèles avec undersampling.
+        Le Random Forest d'Arthur fonctionne mieux : accuracy de 0.960, F1 de 0.875, AUC de 0.998. 
+        Il utilise une technique d'undersampling — on entraîne 4 sous-modèles sur des sous-ensembles 
+        rééquilibrés — ce qui l'aide à mieux détecter les résidences secondaires.
 
-        > ⚠️ Les AUC proches de 1 sont suspects car les labels ont été construits par clustering 
-        sur les mêmes données — il peut y avoir une fuite d'information.
+        Les AUC très élevées des deux modèles restent à interpréter avec prudence : les labels 
+        venant du clustering appliqué aux mêmes données, la tâche de classification est 
+        probablement plus facile qu'elle ne le serait sur des labels indépendants.
         """)
 
     modele = st.selectbox("Modèle", ["Régression Logistique (Romane)", "Random Forest (Arthur)"])
