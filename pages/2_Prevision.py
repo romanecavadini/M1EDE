@@ -1,6 +1,17 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
+import gdown
+import shutil
+from pathlib import Path as _Path
+
+def _ensure_data():
+    _Path("data").mkdir(exist_ok=True)
+    if not _Path("data/export.csv").exists():
+        gdown.download("https://drive.google.com/uc?id=1aZUOVjMTAhSegI70kPmFjUtPWl644FhT", "data/export.csv", quiet=False)
+    if not _Path("data/RES2-6-9.csv").exists():
+        shutil.copy("data/export.csv", "data/RES2-6-9.csv")
+_ensure_data()
 import plotly.graph_objects as go
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
