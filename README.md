@@ -1,10 +1,10 @@
-# ⚡ Projet Data & Énergie — M1 Parcours Énergie, École des Ponts
+#  Projet Data & Énergie — M1 Parcours Énergie, École des Ponts
 
 ## Contexte
 
-Ce projet s'inscrit dans le cadre du cours **Data & Énergie** du parcours Énergie de l'École des Ponts ParisTech. Il s'appuie sur le dataset open data d'Enedis **RES2-6-9kVA**, qui contient les courbes de consommation électrique de clients résidentiels avec chauffage électrique, ayant une puissance souscrite comprise entre 6 et 9 kVA, au pas de 30 minutes.
+Ce projet s'inscrit dans le cadre du cours **Data & Énergie** du parcours Énergie de l'École des Ponts. Il s'appuie sur le dataset open data d'Enedis **RES2-6-9kVA**, qui contient les courbes de consommation électrique de clients résidentiels avec chauffage électrique, ayant une puissance souscrite comprise entre 6 et 9 kVA, au pas de 30 minutes.
 
-> ⚠️ Les valeurs sont des **puissances en kW** au pas de 30 minutes. Pour obtenir une énergie en kWh, il faut multiplier par 0,5.
+> ️ Les valeurs sont des **puissances en kW** au pas de 30 minutes. Pour obtenir une énergie en kWh, il faut multiplier par 0,5.
 
 L'objectif est de comprendre et appliquer plusieurs algorithmes d'IA au secteur de l'énergie, à travers 4 modules :
 1. **Clustering** — détecter les Résidences Principales (RP) et Secondaires (RS)
@@ -18,9 +18,9 @@ L'objectif est de comprendre et appliquer plusieurs algorithmes d'IA au secteur 
 
 | Membre | Contributions |
 |--------|--------------|
-| Romane | Régression logistique, Random Forest (prévision), Réseau de neurones |
+| Romane | Régression logistique, Random Forest (prévision), Réseau de neurones, Dashboard |
 | Arthur | KMeans, Neural Network & RF (classification), ARIMA, GAN |
-| Salma  | Génération statistique, Visualisation, Régression linéaire |
+| Salma  | Génération statistique, Visualisation, Régression linéaire,Génération Bootstraping |
 
 ---
 
@@ -57,7 +57,7 @@ M1EDE/
 | Régression Logistique | 0.82 | 0.00 | 1.00 | Seuil abaissé à 0.2 nécessaire (déséquilibre 86%/14%) |
 | Random Forest (Arthur) | 0.960 | 0.875 | 0.998 | Meilleur modèle |
 
-> ⚠️ L'AUC-ROC proche de 1 peut suggérer un data leakage — les labels ayant été construits par clustering sur les mêmes données.
+>  L'AUC-ROC proche de 1 peut suggérer un data leakage — les labels ayant été construits par clustering sur les mêmes données.
 
 ### 3. Prévision (par client, sur 1 semaine, entraîné sur 2 semaines)
 
@@ -71,7 +71,8 @@ M1EDE/
 ### 4. Génération
 - **GAN** (Arthur) : entraîné séparément sur RP et RS, 100 epochs
 - **Approche statistique** (Salma) : profil moyen + bruit gaussien, plus simple et interprétable
-
+- - **Bootstrapping (Salma)** : tirage aléatoire avec remise de vraies courbes — 
+  les courbes générées sont garanties réalistes car ce sont de vraies courbes réassignées
 ---
 
 ## Installation
@@ -87,5 +88,5 @@ streamlit run app.py
 ---
 
 ## Dashboard en ligne
-
-🔗 *(lien Streamlit Cloud à ajouter après déploiement)*
+Attention : La version en ligne connaît des bugs, mais la version en local fonctionne
+🔗 https://m1ede-arthur-salma-romane.streamlit.app/
