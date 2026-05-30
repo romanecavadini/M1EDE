@@ -47,9 +47,10 @@ def load_and_prepare():
     df_results['prediction_binaire'] = df_results['label']
     return df_daily, df_results
 
-tab1, tab2 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "🤖 GAN (Arthur)",
-    "📊 Approche Statistique (Salma)"
+    "📊 Approche Statistique (Salma)",
+    "🔁 Bootstrapping (Salma)"
 ])
 
 # =============================================================================
@@ -254,3 +255,89 @@ with tab2:
             ],
         }).set_index("")
         st.dataframe(indicators.style.format("{:.2f}"), use_container_width=True)
+
+# =============================================================================
+# TAB 3 — BOOTSTRAPPING (Salma)
+# =============================================================================
+with tab3:
+    st.subheader("Bootstrapping — Salma")
+    st.markdown("""
+    Le bootstrapping génère des courbes synthétiques en tirant aléatoirement des courbes 
+    réelles **avec remise**. C'est l'approche la plus simple : les courbes générées sont 
+    garanties réalistes car ce sont de vraies courbes, juste réassignées à de nouveaux clients.
+    """)
+
+    @st.cache_data
+    def load_bootstrap_data():
+        df = pd.read_csv(DATA_PATH)
+        df = df.rename(columns={"id": "pdl_id", "horodate": "datetime", "valeur": "p_kw"})
+        df["datetime"] = pd.to_datetime(df["datetime"], utc=True, errors="coerce")
+        df = df.dropna(subset=["pdl_id", "datetime", "p_kw"])
+        df_daily = df.pivot_table(
+            index="pdl_id", columns="datetime", values="p_kw", aggfunc="first"
+        ).fillna(0)
+        df_daily.columns = pd.to_datetime(df_daily.columns)
+        df_daily_agg = df_daily.T.resample("D").sum().T
+        labels = pd.read_csv(LABELS_PATH, sep=";")
+        labels["id"] = labels["id"].astype(str)
+        df_daily_agg.index = df_daily_agg.index.astype(str)
+        df_results = labels.set_index("id")[["label"]].copy()
+        df_results["prediction_binaire"] = df_results["label"]
+        return df_daily_agg, df_results
+
+    type_boot = st.radio(
+        "Type de résidence",
+        ["Résidence Principale", "Résidence Secondaire"],
+        horizontal=True, key="boot_type"
+    )
+    consumer_type_boot = 0 if "Principale" in type_boot else 1
+    n_boot = st.slider("Nombre de courbes à générer", 1, 20, 5, key="boot_n")
+    seed_boot = st.slider("Graine aléatoire", 0, 100, 42, key="boot_seed")
+
+    if st.button("Générer (Bootstrapping)", key="btn_boot"):
+        with st.spinner("Chargement et génération..."):
+            df_daily_b, df_results_b = load_bootstrap_data()
+
+            df_classified = df_daily_b.merge(
+                df_results_b["prediction_binaire"], left_index=True, right_index=True
+            )
+            df_filtered = df_classified[
+                df_classified["prediction_binaire"] == consumer_type_boot
+            ].drop(columns=["prediction_binaire"])
+
+            if df_filtered.empty:
+                st.error("Aucune donnée pour ce type.")
+                st.stop()
+
+            synthetic_df = df_filtered.sample(n=n_boot, replace=True, random_state=seed_boot)
+            real_sample  = df_filtered.sample(min(5, len(df_filtered)), random_state=42)
+
+        fig = go.Figure()
+        for i, (idx, row) in enumerate(real_sample.iterrows()):
+            fig.add_trace(go.Scatter(
+                x=list(range(len(row))), y=row.values,
+                name="Réelle", line=dict(color="gray", width=1),
+                opacity=0.5, showlegend=(i == 0)
+            ))
+        for i, (idx, row) in enumerate(synthetic_df.iterrows()):
+            fig.add_trace(go.Scatter(
+                x=list(range(len(row))), y=row.values,
+                name=f"Bootstrap {i+1}", line=dict(width=2, dash="dash")
+            ))
+        fig.update_layout(
+            title=f"Bootstrapping — {type_boot}",
+            xaxis_title="Jours", yaxis_title="Consommation (kWh)",
+            hovermode="x unified"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Statistiques comparatives")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Courbes réelles**")
+            st.metric("Moyenne", f"{df_filtered.values.mean():.2f} kWh")
+            st.metric("Écart-type", f"{df_filtered.values.std():.2f} kWh")
+        with col2:
+            st.markdown("**Courbes bootstrappées**")
+            st.metric("Moyenne", f"{synthetic_df.values.mean():.2f} kWh")
+            st.metric("Écart-type", f"{synthetic_df.values.std():.2f} kWh")
